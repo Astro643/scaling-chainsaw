@@ -1,6 +1,0 @@
-{
-  "imports": {
-    "supabase": "https://esm.sh",
-    "tweetnacl": "https://esm.sh"
-  }
-}
