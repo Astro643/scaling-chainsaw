@@ -1,0 +1,46 @@
+name: Register Discord Slash Commands
+
+on:
+  workflow_dispatch: # Allows you to run this manually by clicking a button on GitHub!
+
+jobs:
+  register:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Register Command Definitions with Discord API
+        run: |
+          curl -X PUT "https://discord.com{{ secrets.DISCORD_APPLICATION_ID }}/commands" \
+          -H "Authorization: Bot ${{ secrets.DISCORD_BOT_TOKEN }}" \
+          -H "Content-Type: application/json" \
+          -d '[
+            {
+              "name": "ticket",
+              "description": "Open a support ticket with AI RAG context assistance",
+              "type": 1,
+              "options": [
+                {
+                  "name": "subject",
+                  "description": "Brief headline of the issue",
+                  "type": 3,
+                  "required": true
+                },
+                {
+                  "name": "description",
+                  "description": "Detailed explanation of what is broken",
+                  "type": 3,
+                  "required": true
+                },
+                {
+                  "name": "category",
+                  "description": "The department or area affected",
+                  "type": 3,
+                  "required": false,
+                  "choices": [
+                    { "name": "Technical Support", "value": "technical" },
+                    { "name": "Billing / Account", "value": "billing" },
+                    { "name": "Discord General", "value": "discord" }
+                  ]
+                }
+              ]
+            }
+          ]'
