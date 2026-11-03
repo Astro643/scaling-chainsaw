@@ -1,12 +1,12 @@
 # Discord Bot AI Ticketing System with RAG
 
-A **Supabase Edge Functions** based ticketing system that uses Retrieval-Augmented Generation (RAG) to provide AI agents with context from historical support tickets.
+A **Supabase Edge Functions** based ticketing system that uses Retrieval-Augmented Generation (RAG) with **Google Gemini embeddings** to provide AI agents with context from historical support tickets.
 
 > **⚡ Built for Supabase Edge Functions (Deno) - Not Next.js**
 
 ## Features
 
-- **Vector Embeddings**: Uses OpenAI's text-embedding-ada-002 (1536 dimensions) for semantic search
+- **Vector Embeddings**: Uses Google Gemini's textembedding-gecko-001 (768 dimensions) for semantic search
 - **pgvector Integration**: Leverages Supabase's built-in vector extension for fast similarity searches
 - **RAG Context**: Automatically finds similar historical tickets to provide context for AI responses
 - **Serverless**: Runs on Supabase Edge Functions - fast, scalable, and cost-effective
@@ -73,8 +73,10 @@ supabase db push --db-url $SUPABASE_DB_URL
 
 In Supabase Dashboard → Project Settings → Secrets:
 ```
-OPENAI_API_KEY=your-openai-api-key
+GEMINI_API_KEY=your-gemini-api-key
 ```
+
+Get your key from: [Google AI Studio](https://aistudio.google.com/app/apikey)
 
 ### 3. Deploy Edge Functions
 
@@ -172,7 +174,7 @@ client.login(process.env.DISCORD_BOT_TOKEN);
 | id | UUID | Primary key |
 | subject | TEXT | Ticket subject |
 | message | TEXT | Ticket message |
-| embedding | vector(1536) | OpenAI embedding |
+| embedding | vector(768) | **Gemini Gecko** embedding (768-dim) |
 | status | TEXT | open/pending/resolved/closed |
 | priority | TEXT | low/medium/high/critical |
 | category | TEXT | Ticket category |
@@ -195,7 +197,7 @@ client.login(process.env.DISCORD_BOT_TOKEN);
 ```env
 SUPABASE_URL=https://<project-ref>.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-OPENAI_API_KEY=your-openai-api-key
+GEMINI_API_KEY=your-gemini-api-key
 SUPABASE_PROJECT_REF=your-project-ref
 SUPABASE_DB_URL=postgresql://postgres:your-password@localhost:5432/postgres
 ```
@@ -203,7 +205,7 @@ SUPABASE_DB_URL=postgresql://postgres:your-password@localhost:5432/postgres
 ### Supabase Secrets
 
 Set these in Supabase Dashboard → Project Settings → Secrets:
-- `OPENAI_API_KEY`
+- `GEMINI_API_KEY` (from [Google AI Studio](https://aistudio.google.com/app/apikey))
 
 ## Deployment
 
@@ -266,7 +268,7 @@ Message: I couldn't login to my account...
 - Uses `ivfflat` index with 100 lists
 - Cosine similarity via `<=>` operator
 - Minimum similarity threshold (default: 0.3)
-- Batch embedding generation (up to 2048 texts)
+- Efficient query building
 - Singleton Supabase client pattern
 
 ## Security
@@ -287,8 +289,8 @@ Message: I couldn't login to my account...
 - [Full Deployment Guide](SUPABASE_DEPLOYMENT.md)
 - [Supabase Edge Functions](https://supabase.com/docs/guides/functions)
 - [pgvector Extension](https://supabase.com/docs/guides/database/extensions/pgvector)
-- [OpenAI Embeddings](https://platform.openai.com/docs/api-reference/embeddings)
+- [Google Gemini Embeddings](https://ai.google.dev/docs/embedding)
 
 ---
 
-**Built with love using Supabase Edge Functions, pgvector, and OpenAI**
+**Built with love using Supabase Edge Functions, pgvector, and Google Gemini**
