@@ -16,9 +16,10 @@ jobs:
         with:
           version: latest
 
-      # 3. Deploys all 5 functions with auto-confirmation and correct remote syntax
-      - run: supabase functions deploy --remote=${{ secrets.SUPABASE_PROJECT_ID }} --yes
+           # 3. Deploys all functions by linking the new explicit import map configuration
+      - run: supabase functions deploy --remote=${{ secrets.SUPABASE_PROJECT_ID }} --import-map=import_map.json --yes
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
 
 
