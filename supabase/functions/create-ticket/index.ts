@@ -1,107 +1,162 @@
-// Supabase Edge Function: Create a new ticket with RAG context
-// POST /functions/v1/create-ticket
-
-import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
 import { generateTicketEmbedding } from '../shared/embeddings.ts';
 import { prepareRAGContext } from '../shared/rag.ts';
-import { createResponse, createErrorResponse, handleCORS, parseBody, validateRequired, formatError } from '../shared/utils.ts';
-import type { TicketInput, Ticket, RAGContext } from '../shared/types.ts';
+import { createClient } from 'https://esm.sh';
+import nacl from 'https://esm.sh';
 
-interface CreateTicketRequest extends TicketInput {
-  matchCount?: number;
-  minSimilarity?: number;
-  maxContextLength?: number;
+// 1. Gather our critical Environment Secrets from the Supabase Platform
+const DISCORD_PUBLIC_KEY = Deno.env.get('DISCORD_PUBLIC_KEY')!;
+const DISCORD_BOT_TOKEN = Deno.env.get('DISCORD_BOT_TOKEN')!;
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+// Setup an authenticated inner admin client to write code to our tickets table
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+  auth: { autoRefreshToken: false, persistSession: false },
+});
+
+// Helper utility to convert Discord's security headers to raw arrays
+function hexToUint8Array(hex: string) {
+  return new Uint8Array(hex.match(/.{1,2}/g)!.map((val) => parseInt(val, 16)));
 }
 
-interface CreateTicketResponse {
-  ticket: Ticket;
-  ragContext: RAGContext;
-}
-
-serve(async (request: Request) => {
-  // Handle CORS preflight
-  const corsResponse = handleCORS(request);
-  if (corsResponse) {
-    return corsResponse;
+// Start our native Deno Web Server
+Deno.serve(async (request: Request) => {
+  // Only process POST requests from Discord
+  if (request.method !== 'POST') {
+    return new Response('Method Not Allowed', { status: 405 });
   }
 
-  try {
-    // Only allow POST
-    if (request.method !== 'POST') {
-      return createErrorResponse('Method not allowed', 405);
-    }
+  // 2. Validate Security Signature (Mandatory: Prevents hackers from spoofing commands)
+  const signature = request.headers.get('X-Signature-Ed25519');
+  const timestamp = request.headers.get('X-Signature-Timestamp');
+  const bodyText = await request.text();
 
-    // Parse request body
-    const body = await parseBody<CreateTicketRequest>(request);
+  if (!signature || !timestamp) {
+    return new Response('Missing request signatures', { status: 401 });
+  }
 
-    // Validate required fields
-    validateRequired(body, ['subject', 'message']);
+  const isVerified = nacl.sign.detached.verify(
+    new TextEncoder().encode(timestamp + bodyText),
+    hexToUint8Array(signature),
+    hexToUint8Array(DISCORD_PUBLIC_KEY)
+  );
 
-    // Get Supabase client from context
-    // Note: In Supabase Edge Functions, the client is available via request context
-    // For local testing, we need to create it differently
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    
-    if (!supabaseUrl || !supabaseKey) {
-      return createErrorResponse('Supabase configuration missing');
-    }
+  if (!isVerified) {
+    return new Response('Invalid request signature', { status: 401 });
+  }
 
-    // Import here to avoid circular dependencies
-    const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2.39.0');
-    const supabase = createClient(supabaseUrl, supabaseKey, {
-      db: { schema: 'public' },
-      auth: { autoRefreshToken: false, persistSession: false },
+  const interaction = JSON.parse(bodyText);
+
+  // 3. Handle Discord's initial test connection check (PING / Type 1)
+  if (interaction.type === 1) {
+    return new Response(JSON.stringify({ type: 1 }), {
+      headers: { 'Content-Type': 'application/json' },
     });
-
-    // Generate embedding for the ticket
-    const embedding = await generateTicketEmbedding(body.subject, body.message);
-
-    // Prepare ticket data
-    const ticketData = {
-      subject: body.subject,
-      message: body.message,
-      embedding,
-      status: 'open',
-      priority: body.priority || 'medium',
-      category: body.category || null,
-      metadata: body.metadata || null,
-    };
-
-    // Insert into Supabase
-    const { data: ticket, error: insertError } = await supabase
-      .from('tickets')
-      .insert(ticketData)
-      .select()
-      .single();
-
-    if (insertError) {
-      console.error('Error creating ticket:', insertError);
-      return createErrorResponse(`Failed to create ticket: ${insertError.message}`);
-    }
-
-    // Generate RAG context
-    const ragContext = await prepareRAGContext(
-      supabase,
-      `${body.subject}: ${body.message}`,
-      embedding,
-      {
-        matchCount: body.matchCount || 5,
-        minSimilarity: body.minSimilarity || 0.3,
-        includeResolvedOnly: true,
-        maxContextLength: body.maxContextLength || 4000,
-      }
-    );
-
-    const responseData: CreateTicketResponse = {
-      ticket: ticket as unknown as Ticket,
-      ragContext,
-    };
-
-    return createResponse<CreateTicketResponse>(responseData, 201);
-
-  } catch (error) {
-    console.error('Error in create-ticket function:', error);
-    return createErrorResponse(formatError(error), 500);
   }
+
+  // 4. Check if a User triggered a Slash Command (Type 2)
+  if (interaction.type === 2) {
+    const { name, options } = interaction.data;
+
+    // Check if they ran your specific ticket command
+    if (name === 'ticket') {
+      // Pull variables out of the slash command inputs
+      const subject = options.find((opt: any) => opt.name === 'subject')?.value;
+      const message = options.find((opt: any) => opt.name === 'description')?.value;
+      const category = options.find((opt: any) => opt.name === 'category')?.value || 'discord';
+      
+      const discordUserId = interaction.member?.user?.id || interaction.user?.id;
+      const interactionToken = interaction.token; // Unique token to update our message later
+
+      if (!subject || !message) {
+        return new Response(
+          JSON.stringify({
+            type: 4,
+            data: { content: '❌ Missing required fields: subject and description.' },
+          }),
+          { headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // ⏳ BEAT THE 3-SECOND WINDOW: Tell Discord we are looking into it immediately
+      // This sends a silent background "Bot is thinking..." status to the user.
+      EdgeRuntime.waitUntil(
+        (async () => {
+          try {
+            // A. Generate embedding via Gemini
+            const embedding = await generateTicketEmbedding(subject, message);
+
+            // B. Write new ticket record to PostgreSQL
+            const { data: ticket, error: insertError } = await supabase
+              .from('tickets')
+              .insert({
+                subject,
+                message,
+                embedding,
+                status: 'open',
+                priority: 'medium',
+                category,
+                metadata: { discordUserId },
+              })
+              .select()
+              .single();
+
+            if (insertError) throw insertError;
+
+            // C. Search historical tickets using your RAG context function
+            const ragContext = await prepareRAGContext(supabase, `${subject}: ${message}`, embedding, {
+              matchCount: 3,
+              minSimilarity: 0.3,
+              includeResolvedOnly: true,
+            });
+
+            // D. Build the final output message string
+            let responseString = `🎟️ **New Ticket Opened!**\n**Subject:** ${ticket.subject}\n**ID:** \`${ticket.id}\`\n\n`;
+            
+            if (ragContext.similar_tickets.length > 0) {
+              const suggestions = ragContext.similar_tickets
+                .filter((t: any) => t.resolution)
+                .map((t: any) => `• *Suggested Fix:* ${t.resolution}`)
+                .join('\n');
+              
+              if (suggestions) {
+                responseString += `💡 **AI Suggestions from Past Tickets:**\n${suggestions}`;
+              }
+            } else {
+              responseString += `✨ No similar past problems found. Our support team will analyze this soon!`;
+            }
+
+            // E. Follow up with Discord to overwrite the "Thinking..." text using the webhook route
+            await fetch(`https://discord.com{interaction.application_id}/${interactionToken}/messages/@original`, {
+              method: 'PATCH',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bot ${DISCORD_BOT_TOKEN}`,
+              },
+              body: JSON.stringify({ content: responseString }),
+            });
+
+          } catch (err) {
+            console.error('Background processing error:', err);
+            // Inform user if the background vector execution crashed
+            await fetch(`https://discord.com{interaction.application_id}/${interactionToken}/messages/@original`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json', 'Authorization': `Bot ${DISCORD_BOT_TOKEN}` },
+              body: JSON.stringify({ content: `❌ An issue occurred while processing your AI ticket.` }),
+            });
+          }
+        })()
+      );
+
+      // Return the initial 200 HTTP payload instantly to stop Discord from timing out
+      return new Response(
+        JSON.stringify({
+          type: 5, // Type 5 = Deferred Channel Message With Source ("Bot is thinking...")
+        }),
+        { headers: { 'Content-Type': 'application/json' }, status: 200 }
+      );
+    }
+  }
+
+  return new Response(JSON.stringify({ error: 'Unknown interaction' }), { status: 400 });
 });
