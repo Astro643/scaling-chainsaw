@@ -1,72 +1,93 @@
+// NPM Registry Build v3
 import { generateTicketEmbedding } from '../shared/embeddings.ts';
 import { prepareRAGContext } from '../shared/rag.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2.39.0';
 import nacl from 'npm:tweetnacl@1.0.3';
 
-// 1. Gather our critical Environment Secrets from the Supabase Platform
+// 1. Fetch Environment Secrets from the Supabase Platform
 const DISCORD_PUBLIC_KEY = Deno.env.get('DISCORD_PUBLIC_KEY')!;
 const DISCORD_BOT_TOKEN = Deno.env.get('DISCORD_BOT_TOKEN')!;
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
-// Setup an authenticated inner admin client to write code to our tickets table
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { autoRefreshToken: false, persistSession: false },
 });
 
-// Helper utility to convert Discord's security headers to raw arrays
+// Helper utility to convert Discord's security headers to raw arrays safely
 function hexToUint8Array(hex: string) {
-  return new Uint8Array(hex.match(/.{1,2}/g)!.map((val) => parseInt(val, 16)));
+  if (!hex) return new Uint8Array(0);
+  const matches = hex.match(/.{1,2}/g);
+  if (!matches) return new Uint8Array(0);
+  return new Uint8Array(matches.map((val) => parseInt(val, 16)));
 }
 
-// Start our native Deno Web Server
 Deno.serve(async (request: Request) => {
-  // Only process POST requests from Discord
+  // Handle CORS Preflight requests smoothly
+  if (request.method === 'OPTIONS') {
+    return new Response('ok', {
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Signature-Ed25519, X-Signature-Timestamp',
+      }
+    });
+  }
+
   if (request.method !== 'POST') {
     return new Response('Method Not Allowed', { status: 405 });
   }
 
-  // 2. Validate Security Signature (Mandatory: Prevents hackers from spoofing commands)
+  // 2. Extract Security Signatures
   const signature = request.headers.get('X-Signature-Ed25519');
   const timestamp = request.headers.get('X-Signature-Timestamp');
+  
+  // Capture raw body text before parsing to guarantee string consistency
   const bodyText = await request.text();
 
   if (!signature || !timestamp) {
     return new Response('Missing request signatures', { status: 401 });
   }
 
-  const isVerified = nacl.sign.detached.verify(
-    new TextEncoder().encode(timestamp + bodyText),
-    hexToUint8Array(signature),
-    hexToUint8Array(DISCORD_PUBLIC_KEY)
-  );
+  // 3. Cryptographic Verification Check
+  let isVerified = false;
+  try {
+    isVerified = nacl.sign.detached.verify(
+      new TextEncoder().encode(timestamp + bodyText),
+      hexToUint8Array(signature),
+      hexToUint8Array(DISCORD_PUBLIC_KEY)
+    );
+  } catch (err) {
+    console.error('Signature calculation crash:', err);
+  }
 
   if (!isVerified) {
+    console.error('Cryptographic match failed for signature:', signature);
     return new Response('Invalid request signature', { status: 401 });
   }
 
   const interaction = JSON.parse(bodyText);
 
-  // 3. Handle Discord's initial test connection check (PING / Type 1)
+  // 4. Respond to Discord's PING check instantly (Type 1)
   if (interaction.type === 1) {
     return new Response(JSON.stringify({ type: 1 }), {
       headers: { 'Content-Type': 'application/json' },
+      status: 200
     });
   }
 
-  // 4. Check if a User triggered a Slash Command (Type 2)
+  // 5. Check if a User triggered a Slash Command (Type 2)
   if (interaction.type === 2) {
     const { name, options } = interaction.data;
 
     // Check if they ran your specific ticket command
     if (name === 'ticket') {
-      // Pull variables out of the slash command inputs
-      const subject = options.find((opt: any) => opt.name === 'subject')?.value;
-      const message = options.find((opt: any) => opt.name === 'description')?.value;
-      const category = options.find((opt: any) => opt.name === 'category')?.value || 'discord';
+      const subject = options?.find((opt: any) => opt.name === 'subject')?.value;
+      const message = options?.find((opt: any) => opt.name === 'description')?.value;
+      const category = options?.find((opt: any) => opt.name === 'category')?.value || 'discord';
       
       const discordUserId = interaction.member?.user?.id || interaction.user?.id;
-      const interactionToken = interaction.token; // Unique token to update our message later
+      const interactionToken = interaction.token; 
 
       if (!subject || !message) {
         return new Response(
@@ -78,8 +99,8 @@ Deno.serve(async (request: Request) => {
         );
       }
 
-      // ⏳ BEAT THE 3-SECOND WINDOW: Tell Discord we are looking into it immediately
-      // This sends a silent background "Bot is thinking..." status to the user.
+      // ⏳ BEAT THE 3-SECOND WINDOW: Send an immediate "Thinking..." state
+      // EdgeRuntime.waitUntil handles the RAG matching asynchronously in the background.
       EdgeRuntime.waitUntil(
         (async () => {
           try {
@@ -126,7 +147,7 @@ Deno.serve(async (request: Request) => {
               responseString += `✨ No similar past problems found. Our support team will analyze this soon!`;
             }
 
-            // E. Follow up with Discord to overwrite the "Thinking..." text using the webhook route
+            // E. Update Discord over standard webhooks using your DISCORD_BOT_TOKEN
             await fetch(`https://discord.com{interaction.application_id}/${interactionToken}/messages/@original`, {
               method: 'PATCH',
               headers: {
@@ -138,20 +159,19 @@ Deno.serve(async (request: Request) => {
 
           } catch (err) {
             console.error('Background processing error:', err);
-            // Inform user if the background vector execution crashed
             await fetch(`https://discord.com{interaction.application_id}/${interactionToken}/messages/@original`, {
               method: 'PATCH',
               headers: { 'Content-Type': 'application/json', 'Authorization': `Bot ${DISCORD_BOT_TOKEN}` },
-              body: JSON.stringify({ content: `❌ An issue occurred while processing your AI ticket.` }),
+              body: JSON.stringify({ content: `❌ An error occurred while running AI ticket generation.` }),
             });
           }
         })()
       );
 
-      // Return the initial 200 HTTP payload instantly to stop Discord from timing out
+      // Return the Type 5 response instantly to satisfy Discord's gateway timeout
       return new Response(
         JSON.stringify({
-          type: 5, // Type 5 = Deferred Channel Message With Source ("Bot is thinking...")
+          type: 5, 
         }),
         { headers: { 'Content-Type': 'application/json' }, status: 200 }
       );
