@@ -2,24 +2,23 @@ name: Deploy Edge Functions
 
 on:
   push:
-    branches: [ main ]  # Runs automatically whenever you update code on the main branch
+    branches: [ main ]  # Automatically triggers deployment when code updates on the main branch
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      # 1. Downloads your code from GitHub to the cloud environment
+      # 1. Pull current repository branches down to cloud runner environment
       - uses: actions/checkout@v4
 
-      # 2. Sets up the official Supabase CLI on the cloud machine
+      # 2. Configure official current version of the Supabase CLI executable
       - uses: supabase/setup-cli@v1
         with:
           version: latest
 
-                     # 3. Deploy functions using remote server-side bundling to prevent timeouts
-      - run: supabase functions deploy --remote=${{ secrets.SUPABASE_PROJECT_ID }} --use-api --yes
+      # 3. Deploy functions using remote server-side bundling and disable JWT restrictions
+      - run: supabase functions deploy --remote=${{ secrets.SUPABASE_PROJECT_ID }} --use-api --no-verify-jwt --yes
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-
 
 
