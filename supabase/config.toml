@@ -1,0 +1,43 @@
+# Supabase Edge Functions configuration
+# https://supabase.com/docs/guides/functions/config
+
+[global]
+# Enable or disable all Edge Functions
+# enabled = true
+
+# Global environment variables (available to all functions)
+# These can be overridden per-function
+# [global.env]
+# MY_VAR = "value"
+
+# Individual function configurations
+
+[functions.create-ticket]
+# Function name: create-ticket
+# Entry point: supabase/functions/create-ticket/index.ts
+# HTTP method: POST
+# Description: Create a new ticket with RAG context
+
+[functions.search-tickets]
+# Function name: search-tickets
+# Entry point: supabase/functions/search-tickets/index.ts
+# HTTP method: POST
+# Description: Search for similar tickets using RAG
+
+[functions.get-ticket]
+# Function name: get-ticket
+# Entry point: supabase/functions/get-ticket/index.ts
+# HTTP method: GET
+# Description: Get a specific ticket by ID
+
+[functions.update-ticket]
+# Function name: update-ticket
+# Entry point: supabase/functions/update-ticket/index.ts
+# HTTP method: PUT
+# Description: Update a ticket's status, priority, or resolution
+
+[functions.list-tickets]
+# Function name: list-tickets
+# Entry point: supabase/functions/list-tickets/index.ts
+# HTTP method: GET
+# Description: List tickets with optional filters
