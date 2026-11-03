@@ -1,0 +1,20 @@
+name: Deploy Edge Functions
+
+on:
+  push:
+    branches: [ main ]  # Runs automatically whenever code updates on the 'main' branch
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      # 1. Download your code from GitHub to the cloud runner
+      - uses: actions/checkout@v4
+
+      # 2. Set up the official Supabase CLI on the cloud runner
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      # 3. Deploy all functions using your hidden repository credentials
+      - run: supabase functions deploy --token ${{ secrets.SUPABASE_ACCESS_TOKEN }} --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
