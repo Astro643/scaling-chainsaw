@@ -1,6 +1,6 @@
 # Supabase Edge Functions Deployment Guide
 
-This guide explains how to deploy the Discord Bot AI Ticketing System using **Supabase Edge Functions**.
+This guide explains how to deploy the Discord Bot AI Ticketing System using **Supabase Edge Functions** with **Google Gemini embeddings**.
 
 ## Overview
 
@@ -80,7 +80,7 @@ Or apply manually via Supabase Dashboard -> SQL Editor:
 
 ### 2. Verify Database
 
-Check that the `tickets` table was created with the `embedding` column and `match_tickets` function.
+Check that the `tickets` table was created with the `embedding` column (768 dimensions) and `match_tickets` function.
 
 ## Environment Variables
 
@@ -88,8 +88,10 @@ Check that the `tickets` table was created with the `embedding` column and `matc
 
 In Supabase Dashboard -> Project Settings -> Secrets:
 ```
-OPENAI_API_KEY=your-openai-api-key
+GEMINI_API_KEY=your-gemini-api-key
 ```
+
+Get your key from: [Google AI Studio](https://aistudio.google.com/app/apikey)
 
 ### Local Development (Optional)
 
@@ -102,7 +104,7 @@ Edit `.env`:
 ```env
 SUPABASE_URL=https://your-project-ref.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-OPENAI_API_KEY=your-openai-api-key
+GEMINI_API_KEY=your-gemini-api-key
 SUPABASE_PROJECT_REF=your-project-ref
 SUPABASE_DB_URL=postgresql://postgres:password@localhost:5432/postgres
 ```
@@ -369,8 +371,8 @@ MIT
 
 - [Supabase Edge Functions](https://supabase.com/docs/guides/functions)
 - [pgvector Extension](https://supabase.com/docs/guides/database/extensions/pgvector)
-- [OpenAI Embeddings](https://platform.openai.com/docs/api-reference/embeddings)
+- [Google Gemini Embeddings](https://ai.google.dev/docs/embedding)
 
 ---
 
-**Built with love using Supabase Edge Functions, pgvector, and OpenAI**
+**Built with love using Supabase Edge Functions, pgvector, and Google Gemini**
