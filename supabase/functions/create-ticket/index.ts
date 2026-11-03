@@ -1,7 +1,7 @@
 import { generateTicketEmbedding } from '../shared/embeddings.ts';
 import { prepareRAGContext } from '../shared/rag.ts';
-import { createClient } from 'https://esm.sh';
-import nacl from 'https://esm.sh';
+import { createClient } from 'npm:@supabase/supabase-js@2.39.0';
+import nacl from 'npm:tweetnacl@1.0.3';
 
 // 1. Gather our critical Environment Secrets from the Supabase Platform
 const DISCORD_PUBLIC_KEY = Deno.env.get('DISCORD_PUBLIC_KEY')!;
