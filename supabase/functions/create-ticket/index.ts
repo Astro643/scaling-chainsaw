@@ -1,4 +1,3 @@
-// Force GitHub Sync
 import { generateTicketEmbedding } from '../shared/embeddings.ts';
 import { prepareRAGContext } from '../shared/rag.ts';
 import { createClient } from 'https://esm.sh';
