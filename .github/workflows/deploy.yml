@@ -16,5 +16,8 @@ jobs:
         with:
           version: latest
 
-      # 3. Deploy all functions using your hidden repository credentials
-      - run: supabase functions deploy --token ${{ secrets.SUPABASE_ACCESS_TOKEN }} --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
+            # 3. Deploy all functions using environment variables instead of flags
+      - run: supabase functions deploy --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
