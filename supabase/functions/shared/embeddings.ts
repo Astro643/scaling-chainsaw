@@ -1,70 +1,59 @@
-// OpenAI embedding service for Supabase Edge Functions
-// Uses Deno's native fetch with ES modules
+// Embedding service for Supabase Edge Functions using Google Gemini
+// Generates 768-dimensional embeddings using textembedding-gecko-001
 
-const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
-const OPENAI_API_URL = 'https://api.openai.com/v1/embeddings';
+const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
+const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/embeddings:embedText';
 
-// Default model produces 1536-dimensional vectors
-const DEFAULT_MODEL = 'text-embedding-ada-002';
+// Default model - Gecko produces 768-dimensional vectors
+const DEFAULT_MODEL = 'models/textembedding-gecko-001';
 
-interface OpenAIEmbeddingRequest {
-  input: string | string[];
+interface GeminiEmbeddingRequest {
   model: string;
-  user?: string;
+  content: string;
 }
 
-interface OpenAIEmbeddingResponse {
-  object: string;
-  data: Array<{
-    object: string;
-    embedding: number[];
-    index: number;
-  }>;
-  model: string;
-  usage: {
-    prompt_tokens: number;
-    total_tokens: number;
+interface GeminiEmbeddingResponse {
+  embedding: {
+    values: number[];
   };
 }
 
 /**
- * Generate embedding for a single text input
+ * Generate embedding for a single text input using Google Gemini
  */
 export async function generateEmbedding(text: string): Promise<{ embedding: number[]; model: string; dimensions: number }> {
-  if (!OPENAI_API_KEY) {
-    throw new Error('OpenAI API key is required');
+  if (!GEMINI_API_KEY) {
+    throw new Error('Gemini API key is required. Set GEMINI_API_KEY environment variable.');
   }
 
-  const request: OpenAIEmbeddingRequest = {
-    input: text,
+  const request: GeminiEmbeddingRequest = {
     model: DEFAULT_MODEL,
-    user: 'discord-ticketing-bot',
+    content: text,
   };
 
-  const response = await fetch(OPENAI_API_URL, {
+  const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${OPENAI_API_KEY}`,
     },
     body: JSON.stringify(request),
   });
 
   if (!response.ok) {
     const error = await response.text();
-    throw new Error(`OpenAI API error: ${response.status} - ${error}`);
+    throw new Error(`Gemini API error: ${response.status} - ${error}`);
   }
 
-  const data: OpenAIEmbeddingResponse = await response.json();
+  const data: GeminiEmbeddingResponse = await response.json();
 
-  if (!data.data || !data.data[0]?.embedding) {
-    throw new Error('Invalid embedding response from OpenAI');
+  if (!data.embedding?.values) {
+    throw new Error('Invalid embedding response from Gemini');
   }
 
   return {
-    embedding: data.data[0].embedding,
-    model: data.model,
-    dimensions: data.data[0].embedding.length,
+    embedding: data.embedding.values,
+    model: DEFAULT_MODEL,
+    dimensions: data.embedding.values.length,
   };
 }
 
@@ -81,53 +70,20 @@ export async function generateTicketEmbedding(subject: string, message: string):
  * Generate embeddings for multiple texts
  */
 export async function generateEmbeddingsBatch(texts: string[]): Promise<Array<{ embedding: number[]; model: string; dimensions: number }>> {
-  if (!OPENAI_API_KEY) {
-    throw new Error('OpenAI API key is required');
+  if (!GEMINI_API_KEY) {
+    throw new Error('Gemini API key is required');
   }
 
   if (texts.length === 0) {
     return [];
   }
 
-  const BATCH_SIZE = 2048;
-  const batches = [];
-  
-  for (let i = 0; i < texts.length; i += BATCH_SIZE) {
-    batches.push(texts.slice(i, i + BATCH_SIZE));
-  }
-
   const results: Array<{ embedding: number[]; model: string; dimensions: number }> = [];
 
-  for (const batch of batches) {
-    const request: OpenAIEmbeddingRequest = {
-      input: batch,
-      model: DEFAULT_MODEL,
-      user: 'discord-ticketing-bot',
-    };
-
-    const response = await fetch(OPENAI_API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${OPENAI_API_KEY}`,
-      },
-      body: JSON.stringify(request),
-    });
-
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`OpenAI API error: ${response.status} - ${error}`);
-    }
-
-    const data: OpenAIEmbeddingResponse = await response.json();
-    
-    data.data.forEach((item) => {
-      results.push({
-        embedding: item.embedding,
-        model: data.model,
-        dimensions: item.embedding.length,
-      });
-    });
+  // Process each text individually (Gemini embeddings API processes one text at a time)
+  for (const text of texts) {
+    const result = await generateEmbedding(text);
+    results.push(result);
   }
 
   return results;
