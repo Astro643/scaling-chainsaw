@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS tickets (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   subject TEXT NOT NULL,
   message TEXT NOT NULL,
-  embedding vector(1536),  -- OpenAI text-embedding-ada-002 produces 1536-dimensional vectors
+  embedding vector(768),  -- Google Gemini textembedding-gecko-001 produces 768-dimensional vectors
   status TEXT DEFAULT 'open' CHECK (status IN ('open', 'pending', 'resolved', 'closed')),
   priority TEXT DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high', 'critical')),
   category TEXT,
@@ -38,7 +38,7 @@ CREATE TRIGGER update_tickets_updated_at
 -- Create function for similarity search using cosine distance
 -- Returns top N most similar tickets based on embedding similarity
 CREATE OR REPLACE FUNCTION match_tickets(
-  query_embedding vector(1536),
+  query_embedding vector(768),
   match_count INT DEFAULT 5,
   min_similarity FLOAT DEFAULT 0.0
 )
