@@ -1,0 +1,31 @@
+{
+  "name": "discord-ticketing-bot-rag",
+  "version": "1.0.0",
+  "description": "Discord Bot AI-styled ticketing system with RAG using Supabase Edge Functions",
+  "private": true,
+  "scripts": {
+    "deploy:functions": "supabase functions deploy --project-ref $SUPABASE_PROJECT_REF",
+    "deploy:all": "supabase functions deploy --project-ref $SUPABASE_PROJECT_REF && supabase db push --db-url $SUPABASE_DB_URL",
+    "db:generate": "supabase gen types --lang=typescript > src/types/database.ts",
+    "db:migrate": "supabase migration up --db-url=$SUPABASE_DB_URL",
+    "dev:functions": "supabase functions serve",
+    "test": "echo 'Add your test commands here'"
+  },
+  "devDependencies": {
+    "supabase": "^1.109.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "supabase",
+    "edge-functions",
+    "rag",
+    "discord",
+    "ticketing",
+    "pgvector",
+    "ai"
+  ],
+  "author": "",
+  "license": "MIT"
+}
