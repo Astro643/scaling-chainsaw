@@ -6,7 +6,7 @@ A **Supabase Edge Functions** based ticketing system that uses Retrieval-Augment
 
 ## Features
 
-- **Vector Embeddings**: Uses Google Gemini's textembedding-gecko-001 (768 dimensions) for semantic search
+- **Vector Embeddings**: Uses Google Gemini's gemini-embedding-001 (3072 dimensions) for semantic search
 - **pgvector Integration**: Leverages Supabase's built-in vector extension for fast similarity searches
 - **RAG Context**: Automatically finds similar historical tickets to provide context for AI responses
 - **Serverless**: Runs on Supabase Edge Functions - fast, scalable, and cost-effective
@@ -174,7 +174,7 @@ client.login(process.env.DISCORD_BOT_TOKEN);
 | id | UUID | Primary key |
 | subject | TEXT | Ticket subject |
 | message | TEXT | Ticket message |
-| embedding | vector(768) | **Gemini Gecko** embedding (768-dim) |
+| embedding | vector(3072) | **Google Gemini** embedding (3072-dim) |
 | status | TEXT | open/pending/resolved/closed |
 | priority | TEXT | low/medium/high/critical |
 | category | TEXT | Ticket category |

@@ -1,21 +1,22 @@
 // Embedding service for Supabase Edge Functions using Google Gemini
-// Generates 768-dimensional embeddings using textembedding-gecko-001
+// Generates 3072-dimensional embeddings using gemini-embedding-001
 
 const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
-const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/embeddings:embedText';
+const GEMINI_API_URL = 'https://googleapis.com/v1/models/gemini-embedding-001:embedContent';
 
-// Default model - Gecko produces 768-dimensional vectors
-const DEFAULT_MODEL = 'models/textembedding-gecko-001';
+// Default model - gemini-embedding-001 produces 3072-dimensional vectors
+const DEFAULT_MODEL = 'gemini-embedding-001';
 
 interface GeminiEmbeddingRequest {
-  model: string;
-  content: string;
+  instances: Array<{
+    content: string;
+  }>;
 }
 
 interface GeminiEmbeddingResponse {
-  embedding: {
+  embeddings: Array<{
     values: number[];
-  };
+  }>;
 }
 
 /**
@@ -27,14 +28,18 @@ export async function generateEmbedding(text: string): Promise<{ embedding: numb
   }
 
   const request: GeminiEmbeddingRequest = {
-    model: DEFAULT_MODEL,
-    content: text,
+    instances: [
+      {
+        content: text,
+      },
+    ],
   };
 
-  const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
+  const response = await fetch(GEMINI_API_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      'x-goog-api-key': GEMINI_API_KEY,
     },
     body: JSON.stringify(request),
   });
@@ -46,14 +51,14 @@ export async function generateEmbedding(text: string): Promise<{ embedding: numb
 
   const data: GeminiEmbeddingResponse = await response.json();
 
-  if (!data.embedding?.values) {
+  if (!data.embeddings || !data.embeddings[0]?.values) {
     throw new Error('Invalid embedding response from Gemini');
   }
 
   return {
-    embedding: data.embedding.values,
+    embedding: data.embeddings[0].values,
     model: DEFAULT_MODEL,
-    dimensions: data.embedding.values.length,
+    dimensions: data.embeddings[0].values.length,
   };
 }
 
@@ -67,11 +72,12 @@ export async function generateTicketEmbedding(subject: string, message: string):
 }
 
 /**
- * Generate embeddings for multiple texts
+ * Generate embeddings for multiple texts using Google Gemini
+ * Note: Gemini processes one text at a time, so we iterate sequentially
  */
 export async function generateEmbeddingsBatch(texts: string[]): Promise<Array<{ embedding: number[]; model: string; dimensions: number }>> {
   if (!GEMINI_API_KEY) {
-    throw new Error('Gemini API key is required');
+    throw new Error('Gemini API key is required. Set GEMINI_API_KEY environment variable.');
   }
 
   if (texts.length === 0) {
@@ -80,7 +86,6 @@ export async function generateEmbeddingsBatch(texts: string[]): Promise<Array<{ 
 
   const results: Array<{ embedding: number[]; model: string; dimensions: number }> = [];
 
-  // Process each text individually (Gemini embeddings API processes one text at a time)
   for (const text of texts) {
     const result = await generateEmbedding(text);
     results.push(result);

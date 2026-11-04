@@ -80,7 +80,7 @@ Or apply manually via Supabase Dashboard -> SQL Editor:
 
 ### 2. Verify Database
 
-Check that the `tickets` table was created with the `embedding` column (768 dimensions) and `match_tickets` function.
+Check that the `tickets` table was created with the `embedding` column (3072 dimensions) and `match_tickets` function.
 
 ## Environment Variables
 
