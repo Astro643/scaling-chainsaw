@@ -145,8 +145,8 @@ Deno.serve(async (request: Request) => {
               responseString += `✨ No similar past problems found. Our support team will analyze this soon!`;
             }
 
-            await fetch(`https://discord.com/api/v10/webhooks/${interaction.application_id}/${interactionToken}/messages/@original`, {
-              method: 'PATCH',
+            await fetch(`https://discord.com/api/v10/webhooks/${interaction.application_id}/${interactionToken}`, {
+              method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bot ${DISCORD_BOT_TOKEN}`,
@@ -156,8 +156,8 @@ Deno.serve(async (request: Request) => {
 
           } catch (err) {
             console.error('Background execution crash:', err);
-            await fetch(`https://discord.com/api/v10/webhooks/${interaction.application_id}/${interactionToken}/messages/@original`, {
-              method: 'PATCH',
+            await fetch(`https://discord.com/api/v10/webhooks/${interaction.application_id}/${interactionToken}`, {
+              method: 'POST',
               headers: { 'Content-Type': 'application/json', 'Authorization': `Bot ${DISCORD_BOT_TOKEN}` },
               body: JSON.stringify({ content: `❌ Critical error processing AI RAG data mappings.` }),
             });
