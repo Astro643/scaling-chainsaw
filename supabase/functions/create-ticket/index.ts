@@ -145,8 +145,7 @@ Deno.serve(async (request: Request) => {
               responseString += `✨ No similar past problems found. Our support team will analyze this soon!`;
             }
 
-            // Fixed trailing slash issue on URL structure path line below
-            await fetch(`https://discord.com{interaction.application_id}/${interactionToken}/messages/@original`, {
+            await fetch(`https://discord.com/api/v10/webhooks/${interaction.application_id}/${interactionToken}/messages/@original`, {
               method: 'PATCH',
               headers: {
                 'Content-Type': 'application/json',
@@ -157,8 +156,7 @@ Deno.serve(async (request: Request) => {
 
           } catch (err) {
             console.error('Background execution crash:', err);
-            // Fixed trailing slash issue on URL structure path line below
-            await fetch(`https://discord.com{interaction.application_id}/${interactionToken}/messages/@original`, {
+            await fetch(`https://discord.com/api/v10/webhooks/${interaction.application_id}/${interactionToken}/messages/@original`, {
               method: 'PATCH',
               headers: { 'Content-Type': 'application/json', 'Authorization': `Bot ${DISCORD_BOT_TOKEN}` },
               body: JSON.stringify({ content: `❌ Critical error processing AI RAG data mappings.` }),
