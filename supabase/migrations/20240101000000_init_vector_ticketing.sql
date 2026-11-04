@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS tickets (
 );
 
 -- Create index on embedding column for fast similarity search
-CREATE INDEX IF NOT EXISTS idx_tickets_embedding ON tickets USING ivfflat (embedding vector_l2_ops) WITH (lists = 100);
+CREATE INDEX IF NOT EXISTS idx_tickets_embedding ON tickets USING hnsw (embedding vector_l2_ops);
 
 -- Create function to update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()
