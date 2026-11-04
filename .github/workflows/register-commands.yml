@@ -9,8 +9,8 @@ jobs:
     steps:
       - name: Register Command Definitions with Discord API
         run: |
-          curl -X PUT "https://discord.com{DISCORD_APP_ID}/commands" \
-          -H "Authorization: Bot ${DISCORD_TOKEN}" \
+          curl -X PUT "https://discord.com/api/v10/applications/${{ env.DISCORD_APP_ID }}/commands" \
+          -H "Authorization: Bot ${{ env.DISCORD_TOKEN }}" \
           -H "Content-Type: application/json" \
           -d '[
             {
