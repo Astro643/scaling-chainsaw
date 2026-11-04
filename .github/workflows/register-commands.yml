@@ -47,4 +47,3 @@ jobs:
         env:
           DISCORD_APP_ID: ${{ secrets.DISCORD_APPLICATION_ID }}
           DISCORD_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
-
