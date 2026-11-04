@@ -95,7 +95,7 @@ Deno.serve(async (request: Request) => {
         return new Response(
           JSON.stringify({
             type: 4,
-            data: { content: '❌ Fields missing: subject and description required.' },
+            data: { content: '\u274c Fields missing: subject and description required.' },
           }),
           { headers: { 'Content-Type': 'application/json' } }
         );
@@ -130,19 +130,19 @@ Deno.serve(async (request: Request) => {
               includeResolvedOnly: true,
             });
 
-            let responseString = `🎟️ **New Ticket Opened!**\n**Subject:** ${ticket.subject}\n**ID:** \`${ticket.id}\`\n\n`;
+            let responseString = `\ud83c\udf9f\ufe0f **New Ticket Opened!**\n**Subject:** ${ticket.subject}\n**ID:** \`${ticket.id}\`\n\n`;
             
             if (ragContext.similar_tickets.length > 0) {
               const suggestions = ragContext.similar_tickets
                 .filter((t: any) => t.resolution)
-                .map((t: any) => `• *Suggested Fix:* ${t.resolution}`)
+                .map((t: any) => `\u2022 *Suggested Fix:* ${t.resolution}`)
                 .join('\n');
               
               if (suggestions) {
-                responseString += `💡 **AI Suggestions from Past Tickets:**\n${suggestions}`;
+                responseString += `\ud83d\udca1 **AI Suggestions from Past Tickets:**\n${suggestions}`;
               }
             } else {
-              responseString += `✨ No similar past problems found. Our support team will analyze this soon!`;
+              responseString += `\u2728 No similar past problems found. Our support team will analyze this soon!`;
             }
 
             await fetch(`https://discord.com/api/v10/webhooks/${interaction.application_id}/${interactionToken}`, {
@@ -156,10 +156,28 @@ Deno.serve(async (request: Request) => {
 
           } catch (err) {
             console.error('Background execution crash:', err);
+            
+            let errorMessage = '\u274c **Error:** ';
+            const errMsg = err.message ? err.message.toLowerCase() : String(err).toLowerCase();
+            
+            if (errMsg.includes('api key') || errMsg.includes('gemini')) {
+              errorMessage += 'GEMINI_API_KEY not set or invalid! Set it in Supabase Secrets.';
+            } else if (errMsg.includes('connection') || errMsg.includes('supabase') || errMsg.includes('auth')) {
+              errorMessage += 'Database connection failed! Check SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.';
+            } else if (errMsg.includes('vector') || errMsg.includes('extension')) {
+              errorMessage += 'pgvector extension not enabled! Run: CREATE EXTENSION IF NOT EXISTS vector;';
+            } else if (errMsg.includes('relation') || errMsg.includes('table')) {
+              errorMessage += 'Tickets table not created! Run the migration first.';
+            } else if (errMsg.includes('signature') || errMsg.includes('verify')) {
+              errorMessage += 'Discord signature verification failed! Check DISCORD_PUBLIC_KEY.';
+            } else {
+              errorMessage += err.message || String(err);
+            }
+            
             await fetch(`https://discord.com/api/v10/webhooks/${interaction.application_id}/${interactionToken}`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', 'Authorization': `Bot ${DISCORD_BOT_TOKEN}` },
-              body: JSON.stringify({ content: `❌ Critical error processing AI RAG data mappings.` }),
+              body: JSON.stringify({ content: errorMessage }),
             });
           }
         })()
